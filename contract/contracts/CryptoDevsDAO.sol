@@ -26,11 +26,11 @@ interface IFakeNFTMarketplace {
  *   Interface for the CryptoDevs NFT Collection
  */
 
-interface ICryptoDevs {
-    /// @dev tokenOfOwnerByIndex() returns a tokenId at a given index from the owners list
-    /// @param owner - address to fetch NFT's tokenID
-    /// @param index - NFt index in the list
-    /// @return Returns tokenId of the NFT
+interface ICryptoDevsNFT {
+    /// @dev tokenOfOwnerByIndex returns a tokenID at given index for owner
+    /// @param owner - address to fetch the NFT TokenID for
+    /// @param index - index of NFT in owned tokens array to fetch
+    /// @return tokenId - the TokenID of the NFT
     function tokenOfOwnerByIndex(address owner, uint256 index)
         external
         view
@@ -38,7 +38,7 @@ interface ICryptoDevs {
 
     /// @dev balanceOf() return the number of NFTs a given address has
     /// @param owner - address to fetch number of NFTs
-    /// @return Returns the number of NFTs owned
+    /// @return balance -  the number of NFTs owned
     function balanceOf(address owner) external view returns (uint256 balance);
 }
 
@@ -159,4 +159,36 @@ contract CryptoDevsDAO is Ownable {
             proposal.nayVotes += numVotes;
         }
     }
+
+    /// @dev executeProposal allows any CryptoDevsNFT holder to execute a proposal after it's deadline has been exceeded
+    /// @param proposalIndex - the index of the proposal to execute in the proposals array
+    function executeProposal(uint256 proposalIndex)
+        external
+        nftHolderOnly
+        inactiveProposalOnly(proposalIndex)
+    {
+        Proposal storage proposal = proposals[proposalIndex];
+
+        // If the proposal has more YAY votes than NAY votes
+        // purchase the NFT from the FakeNFTMarketplace
+        if (proposal.yayVotes > proposal.nayVotes) {
+            uint256 nftPrice = nftMarketplace.getPrice();
+            require(address(this).balance >= nftPrice, "NOT_ENOUGH_FUNDS");
+            nftMarketplace.purchase{value: nftPrice}(proposal.nftTokenId);
+        }
+        proposal.executed = true;
+    }
+
+    function withdrawEther() public onlyOwner {
+        address _owner = owner();
+        uint256 amount = address(this).balance;
+        (bool sent, ) = _owner.call{value: amount}("");
+        require(sent, "Failed to send Ether");
+    }
+
+    // Function to receive Ether. msg.data must be empty
+    receive() external payable {}
+
+    // Fallback function is called when msg.data is not empty
+    fallback() external payable {}
 }

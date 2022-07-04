@@ -5,7 +5,7 @@ contract FakeNFTMarketplace {
     /// @dev Maintain mapping of tokenIds to Owner addresses
     mapping(uint256 => address) public tokens;
 
-    uint256 nftPrice = 0.1 ether;
+    uint256 nftPrice = 0.01 ether;
 
     /// @dev getPrice() returns the price of one NFT
     function getPrice() external view returns (uint256) {
