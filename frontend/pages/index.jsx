@@ -31,13 +31,54 @@ export default function Home() {
   const web3ModalRef = useRef();
 
   // Helper function to connect wallet
+  // const connectWallet = async () => {
+  //   try {
+  //     await getProviderOrSigner();
+  //     setWalletConnected(true);
+  //   } catch (error) {
+  //     console.error(error);
+  //   }
+  // };
+
   const connectWallet = async () => {
     try {
+
+      const { ethereum } = window
+
+      if (!ethereum) {
+        alert('Get MetaMask!');
+        return;
+      }
+      // Get the provider from web3Modal, which in our case is MetaMask
+      // When used for the first time, it prompts the user to connect their wallet
       await getProviderOrSigner();
       setWalletConnected(true);
-    } catch (error) {
-      console.error(error);
+
+
+    } catch (err) {
+      console.log(err)
+
     }
+  };
+
+  // Helper function to return a DAO Contract instance
+  // given a Provider/Signer
+  const getDaoContractInstance = (providerOrSigner) => {
+    return new Contract(
+      CRYPTODEVS_DAO_CONTRACT_ADDRESS,
+      CRYPTODEVS_DAO_ABI,
+      providerOrSigner
+    );
+  };
+
+  // Helper function to return a CryptoDevs NFT Contract instance
+  // given a Provider/Signer
+  const getCryptodevsNFTContractInstance = (providerOrSigner) => {
+    return new Contract(
+      CRYPTODEVS_NFT_CONTRACT_ADDRESS,
+      CRYPTODEVS_NFT_ABI,
+      providerOrSigner
+    );
   };
 
   // Reads the ETH balance of the DAO contract and sets the `treasuryBalance` state variable
@@ -76,6 +117,29 @@ export default function Home() {
       console.error(error);
     }
   };
+  // checks if a user already voted on an specific proposal
+  const checkVoted = async (proposalId) => {
+    try {
+      if(nftBalance > 0){
+        const signer = await getProviderOrSigner(true);
+        const nftContract = getCryptodevsNFTContractInstance(signer)
+        const daoContract = getDaoContractInstance(signer)
+        const userFirstToken = await nftContract.tokenOfOwnerByIndex(signer.getAddress(), 0);
+        const hasVoted = await daoContract.checkVoted(proposalId, userFirstToken);
+        console.log('check voted: ' + hasVoted)
+        if(!hasVoted){
+          return false
+        } else {
+          return true
+        }
+      } else {return false}
+    } catch (error) {
+        console.log(error);
+        return false
+      }
+
+
+  }
 
   // Calls the `createProposal` function in the contract, using the tokenId from `fakeNftTokenId`
   const createProposal = async () => {
@@ -88,8 +152,8 @@ export default function Home() {
       await getNumProposalsInDAO();
       setLoading(false);
     } catch (error) {
-      console.error(error);
-      window.alert(error.data.message);
+      console.log(error);
+      window.alert("Failed to Create Proposal");
     }
   };
 
@@ -101,8 +165,6 @@ export default function Home() {
       const provider = await getProviderOrSigner();
       const daoContract = getDaoContractInstance(provider);
       const proposal = await daoContract.proposals(id);
-      //console.log("tokenId 1 votou? " + daoContract.voters(1))
-      //console.log(daoContract)
       const parsedProposal = {
         proposalId: id,
         nftTokenId: proposal.nftTokenId.toString(),
@@ -110,6 +172,7 @@ export default function Home() {
         yayVotes: proposal.yayVotes.toString(),
         nayVotes: proposal.nayVotes.toString(),
         executed: proposal.executed,
+        hasVoted: await checkVoted(id)
       };
       return parsedProposal;
     } catch (error) {
@@ -126,6 +189,7 @@ export default function Home() {
         const proposal = await fetchProposalById(i);
         proposals.push(proposal);
       }
+      console.log(proposals)
       setProposals(proposals);
       return proposals;
     } catch (error) {
@@ -137,6 +201,7 @@ export default function Home() {
   // proposal ID and Vote
   const voteOnProposal = async (proposalId, _vote) => {
     try {
+
       const signer = await getProviderOrSigner(true);
       const daoContract = getDaoContractInstance(signer);
 
@@ -148,7 +213,7 @@ export default function Home() {
       await fetchAllProposals();
     } catch (error) {
       console.error(error);
-      window.alert(error.data.message);
+      window.alert("Failed to vote");
     }
   };
 
@@ -169,10 +234,17 @@ export default function Home() {
     }
   };
 
-  // Helper function to fetch a Provider/Signer instance from Metamask
+
+
+  //Helper function to fetch a Provider/Signer instance from Metamask without web3modal
   const getProviderOrSigner = async (needSigner = false) => {
-    const provider = await web3ModalRef.current.connect();
-    const web3Provider = new providers.Web3Provider(provider);
+    const { ethereum } = window
+
+    if (!ethereum) {
+      alert('Get MetaMask!');
+      return;
+    }
+    const web3Provider = new providers.Web3Provider(ethereum);
 
     const { chainId } = await web3Provider.getNetwork();
     if (chainId !== 4) {
@@ -187,70 +259,35 @@ export default function Home() {
     return web3Provider;
   };
 
-  //Helper function to fetch a Provider/Signer instance from Metamask without web3modal
-  // const getProviderOrSigner = async (needSigner = false) => {
-  //   const { ethereum } = window
 
-  //       if (!ethereum) {
-  //         alert('Get MetaMask!');
-  //         return;
-  //       }
-  //   const web3Provider = new providers.Web3Provider(ethereum);
-
-  //   const { chainId } = await web3Provider.getNetwork();
-  //   if (chainId !== 4) {
-  //     window.alert("Please switch to the Rinkeby network!");
-  //     throw new Error("Please switch to the Rinkeby network");
-  //   }
-
-  //   if (needSigner) {
-  //     const signer = web3Provider.getSigner();
-  //     return signer;
-  //   }
-  //   return web3Provider;
-  // };
-
-  // Helper function to return a DAO Contract instance
-  // given a Provider/Signer
-  const getDaoContractInstance = (providerOrSigner) => {
-    return new Contract(
-      CRYPTODEVS_DAO_CONTRACT_ADDRESS,
-      CRYPTODEVS_DAO_ABI,
-      providerOrSigner
-    );
-  };
-
-  // Helper function to return a CryptoDevs NFT Contract instance
-  // given a Provider/Signer
-  const getCryptodevsNFTContractInstance = (providerOrSigner) => {
-    return new Contract(
-      CRYPTODEVS_NFT_CONTRACT_ADDRESS,
-      CRYPTODEVS_NFT_ABI,
-      providerOrSigner
-    );
-  };
-
-  // piece of code that runs everytime the value of `walletConnected` changes
-  // so when a wallet connects or disconnects
-  // Prompts user to connect wallet if not connected
-  // and then calls helper functions to fetch the
-  // DAO Treasury Balance, User NFT Balance, and Number of Proposals in the DAO
   useEffect(() => {
-    if (!walletConnected) {
-      web3ModalRef.current = new Web3Modal({
-        network: "rinkeby",
-        providerOptions: {},
-        disableInjectedProvider: false,
-      });
+    connectWallet();
+  }, []);
 
-      connectWallet().then(() => {
-        getDAOTreasuryBalance();
-        getUserNFTBalance();
-        getNumProposalsInDAO();
-      });
+  useEffect(() => {
+    const startEffects = async () => {
+      await getDAOTreasuryBalance();
+      await getUserNFTBalance();
+      await getNumProposalsInDAO();
+      setSelectedTab('')
     }
-  }, [walletConnected]);
+    // if wallet is not connected, create a new instance of Web3Modal and connect the MetaMask wallet
+    if (walletConnected) {
+      startEffects()
+      window.ethereum.on("accountsChanged", () => {
+        console.log("account changed")
+        startEffects()
+      })
+      //console.log('You have metamask')
+      return () => {
+        window.ethereum.removeListener("accountsChanged", () => {
+          console.log("account changed")
+          startEffects()
+        });
+      }
+    }
 
+  }, [walletConnected]);
   // Piece of code that runs everytime the value of `selectedTab` changes
   // Used to re-fetch all proposals in the DAO when user switches
   // to the 'View Proposals' tab
@@ -302,40 +339,45 @@ export default function Home() {
     }
   }
 
-  function renderProposalButtons(proposal){
-    if(proposal.executed){
+  function renderProposalButtons(proposal) {
+    if (proposal.executed) {
       return (
         <div className={styles.description}>Proposal Executed</div>
       )
     } else {
-      if(proposal.deadline.getTime() > Date.now()){
-        return (
+      if (proposal.deadline.getTime() > Date.now()) {
+        if(proposal.hasVoted){
+          return (
+            <div className={styles.description}>You already voted</div>
+          )
+        } else
+        {return (
           <div className={styles.flex}>
-                  <button
-                    className={styles.button2}
-                    onClick={() => voteOnProposal(proposal.proposalId, "YAY")}
-                  >
-                    Vote YAY
-                  </button>
-                  <button
-                    className={styles.button2}
-                    onClick={() => voteOnProposal(proposal.proposalId, "NAY")}
-                  >
-                    Vote NAY
-                  </button>
-                </div>
-        )
+            <button
+              className={styles.button2}
+              onClick={() => voteOnProposal(proposal.proposalId, "YAY")}
+            >
+              Vote YAY
+            </button>
+            <button
+              className={styles.button2}
+              onClick={() => voteOnProposal(proposal.proposalId, "NAY")}
+            >
+              Vote NAY
+            </button>
+          </div>
+        )}
       } else {
         return (
           <div className={styles.flex}>
-                  <button
-                    className={styles.button2}
-                    onClick={() => executeProposal(proposal.proposalId)}
-                  >
-                    Execute Proposal{" "}
-                    {proposal.yayVotes > proposal.nayVotes ? "(YAY)" : "(NAY)"}
-                  </button>
-                </div>
+            <button
+              className={styles.button2}
+              onClick={() => executeProposal(proposal.proposalId)}
+            >
+              Execute Proposal{" "}
+              {proposal.yayVotes > proposal.nayVotes ? "(YAY)" : "(NAY)"}
+            </button>
+          </div>
         )
       }
     }
@@ -366,40 +408,12 @@ export default function Home() {
               <p>Nay Votes: {p.nayVotes}</p>
               <p>Executed?: {p.executed.toString()}</p>
               {nftBalance > 0 ?
-              // (p.deadline.getTime() > Date.now() && !p.executed ? (
-              //   <div className={styles.flex}>
-              //     <button
-              //       className={styles.button2}
-              //       onClick={() => voteOnProposal(p.proposalId, "YAY")}
-              //     >
-              //       Vote YAY
-              //     </button>
-              //     <button
-              //       className={styles.button2}
-              //       onClick={() => voteOnProposal(p.proposalId, "NAY")}
-              //     >
-              //       Vote NAY
-              //     </button>
-              //   </div>
-              // ) : p.deadline.getTime() < Date.now() && !p.executed ? (
-              //   <div className={styles.flex}>
-              //     <button
-              //       className={styles.button2}
-              //       onClick={() => executeProposal(p.proposalId)}
-              //     >
-              //       Execute Proposal{" "}
-              //       {p.yayVotes > p.nayVotes ? "(YAY)" : "(NAY)"}
-              //     </button>
-              //   </div>
-              // ) : (
-              //   <div className={styles.description}>Proposal Executed</div>
-              // ))
-              renderProposalButtons(p)
-              : (
-                <div className={styles.flex}>
-                  You cannot vote without an NFT
-                </div>
-              )}
+                renderProposalButtons(p)
+                : (
+                  <div className={styles.flex}>
+                    You cannot vote without an NFT
+                  </div>
+                )}
             </div>
           ))}
         </div>

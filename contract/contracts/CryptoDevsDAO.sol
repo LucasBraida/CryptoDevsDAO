@@ -178,6 +178,20 @@ contract CryptoDevsDAO is Ownable {
         }
         proposal.executed = true;
     }
+    /// @dev checkNFTAvailable allows to check the availability through the DAO contract
+    /// @param _tokenId - the Id of the NFT
+    function checkNFTAvailable(uint _tokenId) external view returns (bool){
+        return nftMarketplace.available(_tokenId);
+    }
+
+    /// @dev checkVoted checks if a NFT has been used to vote on a proposal
+    /// @param _proposalIndex - the index of the proposal to execute in the proposals array
+    /// @param _userTokenId - the user's NFT Id to check if it has been used
+    function checkVoted(uint _proposalIndex, uint _userTokenId) external view returns (bool){
+        Proposal storage proposal = proposals[_proposalIndex];
+        bool voted = proposal.voters[_userTokenId];
+        return voted;
+    }
 
     function withdrawEther() public onlyOwner {
         address _owner = owner();
